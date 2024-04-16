@@ -72,7 +72,7 @@ async function s3_store(this: any, options: any) {
 
   let local_folder: string = ''
 
-  seneca.init(function(reply: () => void) {
+  seneca.init(function (reply: () => void) {
     if (options.local.active) {
       let folder: string = options.local.folder
       local_folder =
@@ -128,7 +128,7 @@ async function s3_store(this: any, options: any) {
 
   let store = {
     name: 's3-store',
-    save: function(msg: any, reply: any) {
+    save: function (msg: any, reply: any) {
       let canon = msg.ent.entity$
       let id = '' + (msg.ent.id || msg.ent.id$ || generate_id(msg.ent))
       let d = msg.ent.data$()
@@ -225,8 +225,7 @@ async function s3_store(this: any, options: any) {
       }
     },
 
-
-    load: function(msg: any, reply: any) {
+    load: function (msg: any, reply: any) {
       let canon = msg.ent.entity$
       let qent = msg.qent
       let id = '' + msg.q.id
@@ -253,11 +252,9 @@ async function s3_store(this: any, options: any) {
               .split('\n')
               .filter((n: string) => '' !== n)
               .map((n: string) => JSON.parse(n))
-          }
-          else if ('bin' === output) {
+          } else if ('bin' === output) {
             entdata[bin] = body
-          }
-          else {
+          } else {
             entdata = JSON.parse(body)
           }
         }
@@ -287,9 +284,7 @@ async function s3_store(this: any, options: any) {
               }
               reply(err)
             })
-
-        }
-        else {
+        } else {
           Fsp.readFile(full)
             .then((body: any) => {
               replyEnt(body)
@@ -323,9 +318,7 @@ async function s3_store(this: any, options: any) {
 
               reply(err)
             })
-
-        }
-        else {
+        } else {
           const s3cmd = new GetObjectCommand({
             ...s3_shared_options,
             Key: s3id,
@@ -352,11 +345,11 @@ async function s3_store(this: any, options: any) {
     },
 
     // NOTE: S3 folder listing not supported yet.
-    list: function(_msg: any, reply: any) {
+    list: function (_msg: any, reply: any) {
       reply([])
     },
 
-    remove: function(msg: any, reply: any) {
+    remove: function (msg: any, reply: any) {
       let canon = (msg.ent || msg.qent).entity$
       let id = '' + msg.q.id
       let entSpec = options.ent[canon]
@@ -399,11 +392,11 @@ async function s3_store(this: any, options: any) {
       }
     },
 
-    close: function(_msg: any, reply: () => void) {
+    close: function (_msg: any, reply: () => void) {
       reply()
     },
 
-    native: function(_msg: any, reply: any) {
+    native: function (_msg: any, reply: any) {
       reply({ client: aws_s3, local: { ...options.local } })
     },
   }
@@ -479,7 +472,7 @@ async function s3_store(this: any, options: any) {
         let matched = 'aws:s3' === trigger.record.eventSource
         return matched
       },
-      process: async function(
+      process: async function (
         this: typeof seneca,
         trigger: { record: any; event: any },
         gateway: Function,
@@ -506,11 +499,11 @@ function make_s3id(id: string, ent: any, options: any, bin: boolean) {
     null == id
       ? null
       : (null == options.folder
-        ? options.prefix + ent.entity$
-        : options.folder) +
-      ('' == options.folder ? '' : '/') +
-      id +
-      (bin ? '' : options.suffix)
+          ? options.prefix + ent.entity$
+          : options.folder) +
+        ('' == options.folder ? '' : '/') +
+        id +
+        (bin ? '' : options.suffix)
 
   return s3id
 }
