@@ -12,6 +12,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3'
 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -71,7 +72,7 @@ async function s3_store(this: any, options: any) {
 
   let local_folder: string = ''
 
-  seneca.init(function (reply: () => void) {
+  seneca.init(function(reply: () => void) {
     if (options.local.active) {
       let folder: string = options.local.folder
       local_folder =
@@ -92,8 +93,6 @@ async function s3_store(this: any, options: any) {
         if (onObjectCreated) {
           watcher.on('add', (path: string) => {
             const keyPath = path.substring(localFolder.length + 1)
-            // console.log(`WATCH path: ${keyPath}`);
-
             for (let prefix in onObjectCreated) {
               if (keyPath.startsWith(prefix)) {
                 const event = {
@@ -129,9 +128,7 @@ async function s3_store(this: any, options: any) {
 
   let store = {
     name: 's3-store',
-    save: function (msg: any, reply: any) {
-      // console.log('MSG', msg)
-
+    save: function(msg: any, reply: any) {
       let canon = msg.ent.entity$
       let id = '' + (msg.ent.id || msg.ent.id$ || generate_id(msg.ent))
       let d = msg.ent.data$()
@@ -183,9 +180,6 @@ async function s3_store(this: any, options: any) {
         Body = Buffer.from(dj)
       }
 
-      // console.log('BODY', Body, entSpec?.bin ? '' : '<' + Body.toString() + '>')
-      // console.log('options:: ', options, seneca.util.Nid() )
-
       let ento = msg.ent.make$().data$(d)
 
       // Local file
@@ -231,7 +225,8 @@ async function s3_store(this: any, options: any) {
       }
     },
 
-    load: function (msg: any, reply: any) {
+
+    load: function(msg: any, reply: any) {
       let canon = msg.ent.entity$
       let qent = msg.qent
       let id = '' + msg.q.id
@@ -239,6 +234,7 @@ async function s3_store(this: any, options: any) {
       let output: 'ent' | 'jsonl' | 'bin' = 'ent'
       let jsonl = entSpec?.jsonl || msg.jsonl$ || msg.q.jsonl$
       let bin = entSpec?.bin || msg.bin$ || msg.q.bin$
+      let exists = !!(msg.exists$ || msg.q.exists$)
 
       let s3id = make_s3id(id, msg.ent, options, bin)
 
@@ -247,20 +243,23 @@ async function s3_store(this: any, options: any) {
       function replyEnt(body: any) {
         let entdata: any = {}
 
-        // console.log('DES', output, body)
-        if ('bin' !== output) {
-          body = body.toString('utf-8')
-        }
+        if (null != body) {
+          if ('bin' !== output) {
+            body = body.toString('utf-8')
+          }
 
-        if ('jsonl' === output) {
-          entdata[jsonl] = body
-            .split('\n')
-            .filter((n: string) => '' !== n)
-            .map((n: string) => JSON.parse(n))
-        } else if ('bin' === output) {
-          entdata[bin] = body
-        } else {
-          entdata = JSON.parse(body)
+          if ('jsonl' === output) {
+            entdata[jsonl] = body
+              .split('\n')
+              .filter((n: string) => '' !== n)
+              .map((n: string) => JSON.parse(n))
+          }
+          else if ('bin' === output) {
+            entdata[bin] = body
+          }
+          else {
+            entdata = JSON.parse(body)
+          }
         }
 
         entdata.id = id
@@ -272,58 +271,92 @@ async function s3_store(this: any, options: any) {
       // Local file
       if (options.local.active) {
         let full: string = Path.join(local_folder, s3id || id)
-        // console.log('FULL', full)
 
         if (options.debug) {
           console.log(PLUGIN, 'load', full)
         }
 
-        Fsp.readFile(full)
-          .then((body: any) => {
-            replyEnt(body)
-          })
-          .catch((err: any) => {
-            if ('ENOENT' == err.code) {
-              return reply()
-            }
-            reply(err)
-          })
+        if (exists) {
+          Fsp.stat(full)
+            .then(() => {
+              replyEnt(null)
+            })
+            .catch((err: any) => {
+              if ('ENOENT' == err.code) {
+                return reply()
+              }
+              reply(err)
+            })
+
+        }
+        else {
+          Fsp.readFile(full)
+            .then((body: any) => {
+              replyEnt(body)
+            })
+            .catch((err: any) => {
+              if ('ENOENT' == err.code) {
+                return reply()
+              }
+              reply(err)
+            })
+        }
       }
 
       // AWS S3
       else {
-        const s3cmd = new GetObjectCommand({
-          ...s3_shared_options,
-          Key: s3id,
-        })
-
-        aws_s3
-          .send(s3cmd)
-          .then((res: any) => {
-            // console.log(res)
-
-            destream(output, res.Body)
-              .then((body: any) => {
-                replyEnt(body)
-              })
-              .catch((err) => reply(err))
+        if (exists) {
+          const s3cmd = new HeadObjectCommand({
+            ...s3_shared_options,
+            Key: s3id,
           })
-          .catch((err: any) => {
-            if ('NoSuchKey' === err.Code) {
-              return reply()
-            }
 
-            reply(err)
+          aws_s3
+            .send(s3cmd)
+            .then(() => {
+              replyEnt(null)
+            })
+            .catch((err: any) => {
+              if ('NotFound' === err.name) {
+                return reply()
+              }
+
+              reply(err)
+            })
+
+        }
+        else {
+          const s3cmd = new GetObjectCommand({
+            ...s3_shared_options,
+            Key: s3id,
           })
+
+          aws_s3
+            .send(s3cmd)
+            .then((res: any) => {
+              destream(output, res.Body)
+                .then((body: any) => {
+                  replyEnt(body)
+                })
+                .catch((err) => reply(err))
+            })
+            .catch((err: any) => {
+              if ('NoSuchKey' === err.Code) {
+                return reply()
+              }
+
+              reply(err)
+            })
+        }
       }
     },
 
     // NOTE: S3 folder listing not supported yet.
-    list: function (_msg: any, reply: any) {
+    list: function(_msg: any, reply: any) {
       reply([])
     },
 
-    remove: function (msg: any, reply: any) {
+    remove: function(msg: any, reply: any) {
       let canon = (msg.ent || msg.qent).entity$
       let id = '' + msg.q.id
       let entSpec = options.ent[canon]
@@ -366,11 +399,11 @@ async function s3_store(this: any, options: any) {
       }
     },
 
-    close: function (_msg: any, reply: () => void) {
+    close: function(_msg: any, reply: () => void) {
       reply()
     },
 
-    native: function (_msg: any, reply: any) {
+    native: function(_msg: any, reply: any) {
       reply({ client: aws_s3, local: { ...options.local } })
     },
   }
@@ -444,10 +477,9 @@ async function s3_store(this: any, options: any) {
       name: 's3',
       match: (trigger: { record: any }) => {
         let matched = 'aws:s3' === trigger.record.eventSource
-        console.log('S3 MATCHED', matched, trigger)
         return matched
       },
-      process: async function (
+      process: async function(
         this: typeof seneca,
         trigger: { record: any; event: any },
         gateway: Function,
@@ -474,13 +506,12 @@ function make_s3id(id: string, ent: any, options: any, bin: boolean) {
     null == id
       ? null
       : (null == options.folder
-          ? options.prefix + ent.entity$
-          : options.folder) +
-        ('' == options.folder ? '' : '/') +
-        id +
-        (bin ? '' : options.suffix)
+        ? options.prefix + ent.entity$
+        : options.folder) +
+      ('' == options.folder ? '' : '/') +
+      id +
+      (bin ? '' : options.suffix)
 
-  // console.log('make_s3id', s3id, id, ent, options)
   return s3id
 }
 

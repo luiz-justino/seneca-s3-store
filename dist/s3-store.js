@@ -66,7 +66,6 @@ async function s3_store(options) {
                 if (onObjectCreated) {
                     watcher.on('add', (path) => {
                         const keyPath = path.substring(localFolder.length + 1);
-                        // console.log(`WATCH path: ${keyPath}`);
                         for (let prefix in onObjectCreated) {
                             if (keyPath.startsWith(prefix)) {
                                 const event = {
@@ -101,7 +100,6 @@ async function s3_store(options) {
     let store = {
         name: 's3-store',
         save: function (msg, reply) {
-            // console.log('MSG', msg)
             let canon = msg.ent.entity$;
             let id = '' + (msg.ent.id || msg.ent.id$ || generate_id(msg.ent));
             let d = msg.ent.data$();
@@ -139,8 +137,6 @@ async function s3_store(options) {
                 let dj = JSON.stringify(d);
                 Body = Buffer.from(dj);
             }
-            // console.log('BODY', Body, entSpec?.bin ? '' : '<' + Body.toString() + '>')
-            // console.log('options:: ', options, seneca.util.Nid() )
             let ento = msg.ent.make$().data$(d);
             // Local file
             if (options.local.active) {
@@ -188,25 +184,27 @@ async function s3_store(options) {
             let output = 'ent';
             let jsonl = (entSpec === null || entSpec === void 0 ? void 0 : entSpec.jsonl) || msg.jsonl$ || msg.q.jsonl$;
             let bin = (entSpec === null || entSpec === void 0 ? void 0 : entSpec.bin) || msg.bin$ || msg.q.bin$;
+            let exists = !!(msg.exists$ || msg.q.exists$);
             let s3id = make_s3id(id, msg.ent, options, bin);
             output = jsonl && '' != jsonl ? 'jsonl' : bin && '' != bin ? 'bin' : 'ent';
             function replyEnt(body) {
                 let entdata = {};
-                // console.log('DES', output, body)
-                if ('bin' !== output) {
-                    body = body.toString('utf-8');
-                }
-                if ('jsonl' === output) {
-                    entdata[jsonl] = body
-                        .split('\n')
-                        .filter((n) => '' !== n)
-                        .map((n) => JSON.parse(n));
-                }
-                else if ('bin' === output) {
-                    entdata[bin] = body;
-                }
-                else {
-                    entdata = JSON.parse(body);
+                if (null != body) {
+                    if ('bin' !== output) {
+                        body = body.toString('utf-8');
+                    }
+                    if ('jsonl' === output) {
+                        entdata[jsonl] = body
+                            .split('\n')
+                            .filter((n) => '' !== n)
+                            .map((n) => JSON.parse(n));
+                    }
+                    else if ('bin' === output) {
+                        entdata[bin] = body;
+                    }
+                    else {
+                        entdata = JSON.parse(body);
+                    }
                 }
                 entdata.id = id;
                 let ento = qent.make$().data$(entdata);
@@ -215,43 +213,74 @@ async function s3_store(options) {
             // Local file
             if (options.local.active) {
                 let full = path_1.default.join(local_folder, s3id || id);
-                // console.log('FULL', full)
                 if (options.debug) {
                     console.log(PLUGIN, 'load', full);
                 }
-                promises_1.default.readFile(full)
-                    .then((body) => {
-                    replyEnt(body);
-                })
-                    .catch((err) => {
-                    if ('ENOENT' == err.code) {
-                        return reply();
-                    }
-                    reply(err);
-                });
-            }
-            // AWS S3
-            else {
-                const s3cmd = new client_s3_1.GetObjectCommand({
-                    ...s3_shared_options,
-                    Key: s3id,
-                });
-                aws_s3
-                    .send(s3cmd)
-                    .then((res) => {
-                    // console.log(res)
-                    destream(output, res.Body)
+                if (exists) {
+                    promises_1.default.stat(full)
+                        .then(() => {
+                        replyEnt(null);
+                    })
+                        .catch((err) => {
+                        if ('ENOENT' == err.code) {
+                            return reply();
+                        }
+                        reply(err);
+                    });
+                }
+                else {
+                    promises_1.default.readFile(full)
                         .then((body) => {
                         replyEnt(body);
                     })
-                        .catch((err) => reply(err));
-                })
-                    .catch((err) => {
-                    if ('NoSuchKey' === err.Code) {
-                        return reply();
-                    }
-                    reply(err);
-                });
+                        .catch((err) => {
+                        if ('ENOENT' == err.code) {
+                            return reply();
+                        }
+                        reply(err);
+                    });
+                }
+            }
+            // AWS S3
+            else {
+                if (exists) {
+                    const s3cmd = new client_s3_1.HeadObjectCommand({
+                        ...s3_shared_options,
+                        Key: s3id,
+                    });
+                    aws_s3
+                        .send(s3cmd)
+                        .then(() => {
+                        replyEnt(null);
+                    })
+                        .catch((err) => {
+                        if ('NotFound' === err.name) {
+                            return reply();
+                        }
+                        reply(err);
+                    });
+                }
+                else {
+                    const s3cmd = new client_s3_1.GetObjectCommand({
+                        ...s3_shared_options,
+                        Key: s3id,
+                    });
+                    aws_s3
+                        .send(s3cmd)
+                        .then((res) => {
+                        destream(output, res.Body)
+                            .then((body) => {
+                            replyEnt(body);
+                        })
+                            .catch((err) => reply(err));
+                    })
+                        .catch((err) => {
+                        if ('NoSuchKey' === err.Code) {
+                            return reply();
+                        }
+                        reply(err);
+                    });
+                }
             }
         },
         // NOTE: S3 folder listing not supported yet.
@@ -356,7 +385,6 @@ async function s3_store(options) {
             name: 's3',
             match: (trigger) => {
                 let matched = 'aws:s3' === trigger.record.eventSource;
-                console.log('S3 MATCHED', matched, trigger);
                 return matched;
             },
             process: async function (trigger, gateway) {
@@ -384,7 +412,6 @@ function make_s3id(id, ent, options, bin) {
             ('' == options.folder ? '' : '/') +
             id +
             (bin ? '' : options.suffix);
-    // console.log('make_s3id', s3id, id, ent, options)
     return s3id;
 }
 async function destream(output, stream) {

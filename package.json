@@ -40,14 +40,14 @@
     "@aws-sdk/s3-request-presigner": "^3.468.0",
     "@hapi/code": "^9.0.3",
     "@hapi/lab": "^25.2.0",
-    "@seneca/doc": "^6.0.0",
-    "@types/node": "16.18.71",
+    "@seneca/doc": "^7.2.0",
+    "@types/node": "20.12.7",
     "coveralls": "^3.1.1",
     "lab-transform-typescript": "^3.0.1",
-    "prettier": "^3.2.4",
+    "prettier": "^3.2.5",
     "s3rver": "^3.7.1",
     "seneca-store-test": "^5.2.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.4.5"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": ">=3",
@@ -57,6 +57,6 @@
     "seneca-promisify": ">=3"
   },
   "dependencies": {
-    "chokidar": "^3.5.3"
+    "chokidar": "^3.6.0"
   }
 }
