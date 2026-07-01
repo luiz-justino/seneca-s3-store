@@ -21,7 +21,7 @@ $ npm install @seneca/s3-store
 
 ## Quick Example
 
-```js
+```
 const Seneca = require('seneca')
 // import Seneca from 'seneca'
 
