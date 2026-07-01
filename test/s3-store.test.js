@@ -223,14 +223,17 @@ lab.test('bin-s3-basic', async function () {
     map: Buffer.from([1, 2, 3]),
   })
 
-  let exists0 = await s0.entity('optent/planet').load$({id:planet0r.id,exists$:true})
+  let exists0 = await s0
+    .entity('optent/planet')
+    .load$({ id: planet0r.id, exists$: true })
   //console.log('exists0',exists0)
-  expect(exists0).equal({ 'entity$': '-/optent/planet', id: planet0r.id })
+  expect(exists0).equal({ entity$: '-/optent/planet', id: planet0r.id })
 
-  let exists0n = await s0.entity('optent/planet').load$({id:planet0r.id+'-NOT',exists$:true})
+  let exists0n = await s0
+    .entity('optent/planet')
+    .load$({ id: planet0r.id + '-NOT', exists$: true })
   expect(exists0n).equal(null)
 
-  
   let planet1 = await s0.entity('directive/planet').save$({
     directive$: { bin$: 'map' },
     map: Buffer.from([1, 2, 3]),
@@ -282,14 +285,17 @@ lab.test('bin-local-basic', async function () {
     map: Buffer.from([1, 2, 3]),
   })
 
-  let exists0 = await s0.entity('optent/planet').load$({id:planet0.id,exists$:true})
+  let exists0 = await s0
+    .entity('optent/planet')
+    .load$({ id: planet0.id, exists$: true })
   //console.log('exists0',exists0)
-  expect(exists0).equal({ 'entity$': '-/optent/planet', id: planet0.id })
+  expect(exists0).equal({ entity$: '-/optent/planet', id: planet0.id })
 
-  let exists0n = await s0.entity('optent/planet').load$({id:planet0.id+'-NOT',exists$:true})
+  let exists0n = await s0
+    .entity('optent/planet')
+    .load$({ id: planet0.id + '-NOT', exists$: true })
   expect(exists0n).equal(null)
 
-  
   let planet1 = await s0.entity('directive/planet').save$({
     directive$: { bin$: 'map' },
     map: Buffer.from([1, 2, 3]),

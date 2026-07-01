@@ -23,7 +23,7 @@ async function LocalS3() {
   const { port } = await s3rver.run()
 
   console.log('PORT', port)
-  
+
   return {
     s3rver,
     config: {
