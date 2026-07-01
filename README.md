@@ -53,11 +53,7 @@ seneca.entity('foo').save$({id$:'foo0', x:1})
 
 ## More Examples
 
-
-
 ## Motivation
-
-
 
 ## Support
 
@@ -86,7 +82,6 @@ If you're using this module and need help, you can:
 * `ent` : object
 * `init$` : boolean
 
-
 <!--END:options-->
 
 <!--START:action-list-->
@@ -105,8 +100,5 @@ If you're using this module and need help, you can:
 
 The [Senecajs org](https://github.com/senecajs/) encourages open participation. If you feel you can help in any way, be it with documentation, examples, extra testing, or new features please get in touch.
 
-
-
 ## Background
-
 
